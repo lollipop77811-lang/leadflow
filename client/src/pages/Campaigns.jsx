@@ -52,7 +52,6 @@ export default function Campaigns() {
       Object.entries(map).forEach(([k, v]) => (v ? u.searchParams.set(k, v) : u.searchParams.delete(k)));
       if (utm.source === 'facebook') u.searchParams.set('fbclid', '{FB_CLICK_ID}');
       if (utm.source === 'google') u.searchParams.set('gclid', '{GCLID}');
-      if (utm.source === 'tiktok') u.searchParams.set('ttclid', '{TTCLID}');
       return u.toString();
     } catch {
       return base;

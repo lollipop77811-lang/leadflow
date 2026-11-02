@@ -23,11 +23,9 @@ export const SOURCES = [
   'facebook',
   'google',
   'linkedin',
-  'tiktok',
   'youtube',
   'whatsapp',
   'website',
-  'referral',
   'other',
 ];
 

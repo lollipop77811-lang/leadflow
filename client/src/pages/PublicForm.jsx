@@ -61,7 +61,6 @@ function detectLabel(campaign, referrer) {
       : raw.includes('fb') || raw.includes('meta') || raw.includes('facebook') ? 'facebook'
       : raw.includes('goog') || raw.includes('adwords') ? 'google'
       : raw.includes('linked') ? 'linkedin'
-      : raw.includes('tik') ? 'tiktok'
       : raw.includes('you') ? 'youtube'
       : raw.includes('whats') || raw === 'wa' ? 'whatsapp'
       : raw;

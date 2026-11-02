@@ -55,7 +55,7 @@ export default function AddLeadModal({ onClose, onCreated }) {
   return (
     <Modal
       title="Add a lead"
-      subtitle="Manually add someone who reached out offline — a call, DM or referral."
+      subtitle="Manually add someone who reached out offline — a call or a direct message."
       onClose={onClose}
       width={560}
       footer={

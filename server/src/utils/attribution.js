@@ -37,11 +37,11 @@ export function detectSource({ source, campaign = {}, referrer = '', pageUrl = '
   }
 
   const haystack = `${referrer} ${pageUrl}`.toLowerCase();
-  for (const platform of ['instagram', 'facebook', 'linkedin', 'youtube', 'tiktok', 'google']) {
+  for (const platform of ['instagram', 'facebook', 'linkedin', 'youtube', 'google']) {
     if (haystack.includes(platform)) return platform;
   }
   if (haystack.includes('wa.me') || haystack.includes('whatsapp')) return 'whatsapp';
-  if (referrer) return 'referral';
+  if (referrer) return 'website';
   return 'other';
 }
 

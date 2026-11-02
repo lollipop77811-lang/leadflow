@@ -7,8 +7,8 @@ export default function Login() {
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [email, setEmail] = useState('admin@leadflow.dev');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -66,7 +66,7 @@ export default function Login() {
           </div>
         </div>
 
-        <div style={{ fontSize: 12, color: '#7d8bab' }}>React + Vite · Express · MongoDB</div>
+        <div />
       </div>
 
       <div className="auth-side">
@@ -110,16 +110,6 @@ export default function Login() {
               {loading ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
-
-          <div className="demo-box">
-            <b>Demo credentials</b>
-            <br />
-            Email: <code>admin@leadflow.dev</code>
-            <br />
-            Password: <code>admin123</code>
-            <br />
-            <span style={{ opacity: 0.75 }}>Change these in server/.env before going live.</span>
-          </div>
 
           <a href="/f/main" style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center' }}>
             Not an admin? Open the public lead form →

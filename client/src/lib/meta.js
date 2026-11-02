@@ -14,10 +14,8 @@ export const SOURCES = [
   { id: 'google', label: 'Google Ads', color: '#ea4335', letter: 'G' },
   { id: 'linkedin', label: 'LinkedIn', color: '#0a66c2', letter: 'in' },
   { id: 'youtube', label: 'YouTube', color: '#ff0000', letter: '▶' },
-  { id: 'tiktok', label: 'TikTok', color: '#111827', letter: 'TT' },
   { id: 'whatsapp', label: 'WhatsApp', color: '#25d366', letter: 'WA' },
   { id: 'website', label: 'Website', color: '#0ea5a4', letter: 'W' },
-  { id: 'referral', label: 'Referral', color: '#f59e0b', letter: 'R' },
   { id: 'other', label: 'Other', color: '#94a3b8', letter: '•' },
 ];
 
@@ -28,5 +26,5 @@ export const AD_PRESETS = [
   { label: 'Facebook', source: 'facebook', medium: 'paid_social', campaign: 'FB_LeadGen_Retarget', content: 'carousel_a' },
   { label: 'Google Search', source: 'google', medium: 'cpc', campaign: 'Search_HighIntent', content: 'ad_1' },
   { label: 'LinkedIn', source: 'linkedin', medium: 'paid_social', campaign: 'LI_B2B_Founders', content: 'single_image' },
-  { label: 'WhatsApp Broadcast', source: 'whatsapp', medium: 'referral', campaign: 'WA_Broadcast_1', content: '' },
+  { label: 'WhatsApp Broadcast', source: 'whatsapp', medium: 'broadcast', campaign: 'WA_Broadcast_1', content: '' },
 ];
