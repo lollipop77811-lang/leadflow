@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import Icon from './Icon';
 
 const HeaderCtx = createContext(null);
 
@@ -7,16 +6,13 @@ const HeaderCtx = createContext(null);
  * Renders the sticky top bar and lets the active page drive its title,
  * subtitle and action buttons through usePageHeader().
  */
-export function PageHeaderProvider({ onMenu, children }) {
+export function PageHeaderProvider({ children }) {
   const [config, setConfig] = useState({ title: '', subtitle: '', actions: null });
   const value = useMemo(() => ({ setConfig }), []);
 
   return (
     <HeaderCtx.Provider value={value}>
       <header className="topbar">
-        <button className="icon-btn mobile-only" onClick={onMenu} aria-label="Open menu">
-          <Icon name="menu" size={18} />
-        </button>
         <div style={{ minWidth: 0 }}>
           <h1>{config.title}</h1>
           {config.subtitle && <div className="sub">{config.subtitle}</div>}

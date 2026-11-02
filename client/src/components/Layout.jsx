@@ -15,13 +15,10 @@ const NAV = [
 
 export default function Layout() {
   const { user, logout } = useAuth();
-  const [open, setOpen] = useState(false);
   const [db, setDb] = useState(null);
   const [newCount, setNewCount] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
-
-  useEffect(() => setOpen(false), [location.pathname]);
 
   useEffect(() => {
     let alive = true;
@@ -48,8 +45,7 @@ export default function Layout() {
 
   return (
     <div className="shell">
-      {open && <div className="sidebar-backdrop" onClick={() => setOpen(false)} />}
-      <aside className={`sidebar ${open ? 'open' : ''}`}>
+      <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">L</div>
           <div>
@@ -112,7 +108,7 @@ export default function Layout() {
       </aside>
 
       <div className="main">
-        <PageHeaderProvider onMenu={() => setOpen(true)}>
+        <PageHeaderProvider>
           <main className="content">
             <Outlet />
           </main>
