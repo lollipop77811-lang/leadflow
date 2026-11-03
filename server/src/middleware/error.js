@@ -18,8 +18,9 @@ export const errorHandler = (err, req, res, next) => {
     return res.status(409).json({ message: 'That record already exists.' });
   }
 
-  console.error('❌', err);
-  res.status(err.status || 500).json({ message: err.message || 'Something went wrong.' });
+  const status = err.status || 500;
+  if (status >= 500) console.error('❌', err);
+  res.status(status).json({ message: err.message || 'Something went wrong.' });
 };
 
 // Wraps async route handlers so rejected promises hit the error handler.

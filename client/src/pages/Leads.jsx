@@ -1,35 +1,43 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, downloadCsv, qs } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { currency, initials, num, relativeTime } from '../lib/format';
-import { SOURCES, STATUSES } from '../lib/meta';
+import { LOST_REASONS, SOURCES, STATUSES, WA_TEMPLATES, waLink } from '../lib/meta';
 import { useToast } from '../lib/toast';
 import { usePageHeader } from '../components/PageHeader';
-import { SourceTag, StatusBadge } from '../components/Badges';
+import { Chip, DocProgress, FollowUpChip, SourceTag, StatusBadge, VehicleLine } from '../components/Badges';
 import LeadDrawer from '../components/LeadDrawer';
 import AddLeadModal from '../components/AddLeadModal';
 import Icon from '../components/Icon';
 
 const PAGE_SIZE = 20;
 
+const EMPTY_FILTERS = {
+  q: '',
+  status: '',
+  source: '',
+  lostReason: '',
+  assignedTo: '',
+  due: '',
+  sort: 'newest',
+  from: '',
+  to: '',
+};
+
 export default function Leads() {
-  const [filters, setFilters] = useState({
-    q: '',
-    status: '',
-    source: '',
-    sort: 'newest',
-    from: '',
-    to: '',
-  });
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [search, setSearch] = useState('');
-  const [data, setData] = useState({ items: [], total: 0, page: 1, pages: 1 });
+  const [data, setData] = useState({ items: [], total: 0, page: 1, pages: 1, statusCounts: {} });
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(null);
   const [adding, setAdding] = useState(false);
+  const [users, setUsers] = useState([]);
   const toast = useToast();
   const firstLoad = useRef(true);
 
-  // debounce the search box
   useEffect(() => {
     const t = setTimeout(() => {
       setFilters((f) => (f.q === search ? f : { ...f, q: search }));
@@ -38,12 +46,17 @@ export default function Leads() {
     return () => clearTimeout(t);
   }, [search]);
 
+  useEffect(() => {
+    if (!isAdmin) return;
+    api('/users')
+      .then((d) => setUsers(d.users || []))
+      .catch(() => {});
+  }, [isAdmin]);
+
   const load = useCallback(async () => {
     if (!firstLoad.current) setLoading(true);
     try {
-      const res = await api(
-        `/leads${qs({ ...filters, page, limit: PAGE_SIZE })}`
-      );
+      const res = await api(`/leads${qs({ ...filters, page, limit: PAGE_SIZE })}`);
       setData(res);
     } catch (err) {
       toast.error(err.message);
@@ -57,19 +70,13 @@ export default function Leads() {
     load();
   }, [load]);
 
-  // CSV export honours the current filters
-  const params = filters;
-
-  const activeFilters =
-    (filters.status ? 1 : 0) +
-    (filters.source ? 1 : 0) +
-    (filters.from ? 1 : 0) +
-    (filters.to ? 1 : 0) +
-    (filters.q ? 1 : 0);
+  const activeFilters = Object.entries(filters).filter(
+    ([k, v]) => v && !['sort'].includes(k)
+  ).length;
 
   const exportCsv = async () => {
     try {
-      await downloadCsv(params);
+      await downloadCsv(filters);
       toast.success('CSV exported');
     } catch (err) {
       toast.error(err.message);
@@ -85,6 +92,12 @@ export default function Leads() {
     } catch (err) {
       toast.error(err.message);
     }
+  };
+
+  const clearFilters = () => {
+    setSearch('');
+    setFilters(EMPTY_FILTERS);
+    setPage(1);
   };
 
   const header = useMemo(
@@ -104,17 +117,13 @@ export default function Leads() {
   usePageHeader(
     {
       title: 'Leads',
-      subtitle: `${num(data.total)} ${data.total === 1 ? 'lead' : 'leads'} in your workspace`,
+      subtitle: `${num(data.total)} ${data.total === 1 ? 'lead' : 'leads'} · ${num(
+        data.statusCounts?.new || 0
+      )} waiting for first call`,
       actions: header,
     },
-    [header, data.total]
+    [header, data.total, data.statusCounts]
   );
-
-  const clearFilters = () => {
-    setSearch('');
-    setFilters({ q: '', status: '', source: '', sort: 'newest', from: '', to: '' });
-    setPage(1);
-  };
 
   return (
     <div className="page-section">
@@ -126,7 +135,7 @@ export default function Leads() {
             </span>
             <input
               className="input"
-              placeholder="Search name, email, phone, company, campaign…"
+              placeholder="Search name, phone, car, RC number, city, campaign…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -134,14 +143,14 @@ export default function Leads() {
 
           <select
             className="select"
-            style={{ width: 140 }}
+            style={{ width: 138 }}
             value={filters.status}
             onChange={(e) => {
               setFilters({ ...filters, status: e.target.value });
               setPage(1);
             }}
           >
-            <option value="">All statuses</option>
+            <option value="">All stages</option>
             {STATUSES.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.label}
@@ -151,7 +160,7 @@ export default function Leads() {
 
           <select
             className="select"
-            style={{ width: 150 }}
+            style={{ width: 148 }}
             value={filters.source}
             onChange={(e) => {
               setFilters({ ...filters, source: e.target.value });
@@ -169,39 +178,49 @@ export default function Leads() {
           <select
             className="select"
             style={{ width: 150 }}
+            value={filters.due}
+            onChange={(e) => {
+              setFilters({ ...filters, due: e.target.value });
+              setPage(1);
+            }}
+          >
+            <option value="">Any follow-up</option>
+            <option value="overdue">Overdue follow-up</option>
+            <option value="today">Due today</option>
+          </select>
+
+          {isAdmin && (
+            <select
+              className="select"
+              style={{ width: 145 }}
+              value={filters.assignedTo}
+              onChange={(e) => {
+                setFilters({ ...filters, assignedTo: e.target.value });
+                setPage(1);
+              }}
+            >
+              <option value="">Anyone</option>
+              <option value="unassigned">Unassigned</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <select
+            className="select"
+            style={{ width: 140 }}
             value={filters.sort}
             onChange={(e) => setFilters({ ...filters, sort: e.target.value })}
           >
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
-            <option value="value_desc">Highest value</option>
-            <option value="value_asc">Lowest value</option>
+            <option value="follow_up">Follow-up due</option>
+            <option value="value_desc">Highest quote</option>
             <option value="name_asc">Name A→Z</option>
-            <option value="name_desc">Name Z→A</option>
           </select>
-
-          <input
-            className="input"
-            style={{ width: 138 }}
-            type="date"
-            value={filters.from}
-            onChange={(e) => {
-              setFilters({ ...filters, from: e.target.value });
-              setPage(1);
-            }}
-            title="From date"
-          />
-          <input
-            className="input"
-            style={{ width: 138 }}
-            type="date"
-            value={filters.to}
-            onChange={(e) => {
-              setFilters({ ...filters, to: e.target.value });
-              setPage(1);
-            }}
-            title="To date"
-          />
 
           {activeFilters > 0 && (
             <button className="btn btn-sm btn-ghost" onClick={clearFilters}>
@@ -214,37 +233,38 @@ export default function Leads() {
           <table className="leads">
             <thead>
               <tr>
-                <th>Lead</th>
-                <th>Status</th>
+                <th>Customer & vehicle</th>
+                <th>Stage</th>
+                <th>Quote</th>
+                <th>Docs</th>
+                <th>Follow-up</th>
                 <th>Source</th>
-                <th>Campaign</th>
-                <th style={{ textAlign: 'right' }}>Value</th>
-                <th>Created</th>
-                <th style={{ width: 70 }} />
+                {isAdmin && <th>Owner</th>}
+                <th style={{ width: 84 }} />
               </tr>
             </thead>
             <tbody>
               {loading &&
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr key={`sk-${i}`}>
-                    <td colSpan={7}>
-                      <div className="skeleton" style={{ height: 22, width: '100%' }} />
+                    <td colSpan={isAdmin ? 8 : 7}>
+                      <div className="skeleton" style={{ height: 26, width: '100%' }} />
                     </td>
                   </tr>
                 ))}
 
               {!loading && data.items.length === 0 && (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={isAdmin ? 8 : 7}>
                     <div className="empty">
-                      <div className="emoji">🔍</div>
+                      <div className="emoji">🚗</div>
                       <h4>No leads found</h4>
                       <p>
                         {activeFilters
-                          ? 'Try clearing a filter or searching for something else.'
-                          : 'Share your ad link — new form submissions will land here.'}
+                          ? 'Try clearing a filter or searching something else.'
+                          : 'Once your ad form gets a submission it lands here.'}
                       </p>
-                      <div style={{ marginTop: 12, display: 'flex', gap: 8, justifyContent: 'center' }}>
+                      <div style={{ marginTop: 12 }}>
                         {activeFilters ? (
                           <button className="btn btn-sm" onClick={clearFilters}>
                             Clear filters
@@ -267,41 +287,79 @@ export default function Leads() {
                       <div className="lead-name">
                         <span className="avatar-sq">{initials(lead.name)}</span>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ textOverflow: 'ellipsis', overflow: 'hidden' }}>{lead.name}</div>
-                          <div className="lead-sub">{lead.email}</div>
+                          <div className="row-1">
+                            {lead.name}
+                            {lead.duplicateCount > 0 && <Chip color="#b45309">↺ repeat</Chip>}
+                            {lead.outOfArea && <Chip color="#b91c1c">out of area</Chip>}
+                          </div>
+                          <div className="lead-sub">
+                            <VehicleLine lead={lead} /> · {lead.phone}
+                          </div>
                         </div>
                       </div>
                     </td>
                     <td>
                       <StatusBadge status={lead.status} />
+                      {lead.status === 'lost' && lead.lostReason && (
+                        <div className="lead-sub" style={{ marginTop: 3 }}>
+                          {LOST_REASONS.find((r) => r.id === lead.lostReason)?.label}
+                        </div>
+                      )}
+                    </td>
+                    <td className="cell-value">
+                      {lead.quote?.amount ? currency(lead.quote.amount) : <span className="muted">—</span>}
+                      {lead.payout?.amount > 0 && (
+                        <div className="lead-sub">paid {currency(lead.payout.amount)}</div>
+                      )}
+                    </td>
+                    <td>
+                      <DocProgress documents={lead.documents} />
+                    </td>
+                    <td>
+                      <FollowUpChip date={lead.followUpAt} status={lead.status} />
+                      <div className="lead-sub">
+                        {lead.pickup?.scheduledDate
+                          ? `pickup ${relativeTime(lead.pickup.scheduledDate)}`
+                          : relativeTime(lead.createdAt)}
+                      </div>
                     </td>
                     <td>
                       <SourceTag source={lead.source} />
+                      {lead.campaign?.name && <div className="lead-sub">{lead.campaign.name}</div>}
                     </td>
-                    <td>
-                      <div style={{ fontSize: 12.5, fontWeight: 550 }}>
-                        {lead.campaign?.name || <span style={{ color: 'var(--muted)' }}>—</span>}
-                      </div>
-                      {lead.campaign?.content && <div className="lead-sub">{lead.campaign.content}</div>}
-                    </td>
-                    <td style={{ textAlign: 'right' }} className="cell-value">
-                      {lead.value ? currency(lead.value) : '—'}
-                    </td>
-                    <td style={{ color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>
-                      {relativeTime(lead.createdAt)}
-                    </td>
+                    {isAdmin && <td className="cell-owner">{lead.assignedToName || 'Unassigned'}</td>}
                     <td>
                       <div className="row-actions">
-                        <button
-                          className="icon-btn danger"
-                          title="Delete lead"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeLead(lead._id);
-                          }}
+                        <a
+                          className="icon-btn wa"
+                          title="WhatsApp"
+                          href={waLink(lead.phone, WA_TEMPLATES.intro(lead))}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <Icon name="trash" size={13} />
-                        </button>
+                          <Icon name="whatsapp" size={13} />
+                        </a>
+                        <a
+                          className="icon-btn"
+                          title="Call"
+                          href={`tel:${lead.phone.replace(/[^\d+]/g, '')}`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Icon name="phone" size={13} />
+                        </a>
+                        {isAdmin && (
+                          <button
+                            className="icon-btn danger"
+                            title="Delete lead"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeLead(lead._id);
+                            }}
+                          >
+                            <Icon name="trash" size={13} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -330,11 +388,7 @@ export default function Leads() {
           <span style={{ padding: '0 4px' }}>
             Page {data.page} / {data.pages}
           </span>
-          <button
-            className="btn btn-sm"
-            disabled={data.page >= data.pages}
-            onClick={() => setPage((p) => p + 1)}
-          >
+          <button className="btn btn-sm" disabled={data.page >= data.pages} onClick={() => setPage((p) => p + 1)}>
             Next <Icon name="right" size={12} />
           </button>
         </div>

@@ -32,6 +32,13 @@ const PATHS = {
   board: 'M3 3h18v18H3zM9 3v18M15 3v18',
   arrowUpRight: 'M7 17 17 7M7 7h10v10',
   refresh: 'M21 12a9 9 0 1 1-3-6.7M21 3v6h-6',
+  whatsapp: 'M20.5 11.6a8.4 8.4 0 0 1-12.4 7.4L3.5 20.5l1.6-4.4A8.4 8.4 0 1 1 20.5 11.6z',
+  car: 'M5 17h14M6 17l-1.2-5.2A2 2 0 0 1 6.8 9h10.4a2 2 0 0 1 2 2.8L18 17M7 9l1.2-3.2A2 2 0 0 1 10.1 4h3.8a2 2 0 0 1 1.9 1.8L17 9M7.5 20v-3M16.5 20v-3',
+  users: 'M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+  truck: 'M1 4h11v11H1zM12 8h4l3 3v4h-7zM5.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3M17 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3',
+  doc: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M9 15l2 2 4-4',
+  rupee: 'M6 3h12M6 8h12M15 21 6 13h3a6 6 0 0 0 0-12',
+  qr: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h3v3h-3zM20 14v3M14 20h3M20 20h1',
 };
 
 export default function Icon({ name, size = 16, stroke = 1.9, style, className }) {

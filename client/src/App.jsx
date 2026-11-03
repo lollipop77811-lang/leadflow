@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Overview from './pages/Overview';
 import Leads from './pages/Leads';
 import Pipeline from './pages/Pipeline';
+import Today from './pages/Today';
 import Campaigns from './pages/Campaigns';
 import Settings from './pages/Settings';
 import PublicForm from './pages/PublicForm';
@@ -52,6 +53,7 @@ export default function App() {
             <Route path="/" element={<Overview />} />
             <Route path="/leads" element={<Leads />} />
             <Route path="/pipeline" element={<Pipeline />} />
+            <Route path="/today" element={<Today />} />
             <Route path="/campaigns" element={<Campaigns />} />
             <Route path="/settings" element={<Settings />} />
           </Route>

@@ -11,6 +11,8 @@ import { errorHandler, notFound } from './middleware/error.js';
 import authRoutes from './routes/auth.js';
 import leadRoutes from './routes/leads.js';
 import statsRoutes from './routes/stats.js';
+import userRoutes from './routes/users.js';
+import spendRoutes from './routes/spend.js';
 import { seedAdmin, seedDemoLeads } from './seed.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -25,7 +27,8 @@ app.use(
     credentials: false,
   })
 );
-app.use(express.json({ limit: '200kb' }));
+// Vehicle photos are sent as data URLs, so allow a bigger payload.
+app.use(express.json({ limit: '8mb' }));
 app.use(morgan('dev'));
 
 app.get('/api/health', (req, res) => {
@@ -35,6 +38,8 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/spend', spendRoutes);
 
 // Serve the built React app when it exists (npm run build in /client).
 const clientDist = path.resolve(__dirname, '../../client/dist');
@@ -59,6 +64,7 @@ async function start() {
   if (env.seedDemo) {
     const seeded = await seedDemoLeads();
     if (seeded.inserted) console.log(`🌱 Seeded ${seeded.inserted} demo leads`);
+    if (seeded.telecaller) console.log(`👥 Demo telecaller → ${seeded.telecaller}`);
   }
 
   app.listen(env.port, '0.0.0.0', () => {

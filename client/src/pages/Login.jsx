@@ -45,16 +45,16 @@ export default function Login() {
         </div>
 
         <div>
-          <h2>Turn every ad click into a tracked, actionable lead.</h2>
+          <h2>Every scrap enquiry, quoted and picked up on time.</h2>
           <p>
-            One dashboard for Instagram, Facebook, Google, LinkedIn and WhatsApp leads — captured the moment
-            someone submits your form.
+            One dashboard for the leads your Instagram, Facebook, Google and Justdial ads bring in — with vehicle
+            details, quotes, pickups and RTO paperwork in one place.
           </p>
           <div className="hero-points">
             {[
-              'Real-time capture from every ad platform',
-              'UTM + click-ID attribution on every lead',
-              'Pipeline board, notes and CSV export',
+              'Vehicle details captured before the first call',
+              'Quote calculator, pickup schedule and document checklist',
+              'CD / deregistration tracking with WhatsApp updates',
             ].map((t) => (
               <div className="hero-point" key={t}>
                 <span className="tick">

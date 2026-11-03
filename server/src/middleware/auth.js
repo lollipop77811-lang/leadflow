@@ -17,10 +17,22 @@ export async function requireAuth(req, res, next) {
     }
     const payload = jwt.verify(token, env.jwtSecret);
     const user = await User.findById(payload.sub);
-    if (!user) return res.status(401).json({ message: 'Session expired. Sign in again.' });
+    if (!user || user.active === false) {
+      return res.status(401).json({ message: 'Session expired. Sign in again.' });
+    }
     req.user = user;
     next();
   } catch {
     return res.status(401).json({ message: 'Invalid or expired session.' });
   }
+}
+
+/** Restrict a route to specific roles, e.g. requireRole('admin'). */
+export function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'You do not have permission to do that.' });
+    }
+    next();
+  };
 }

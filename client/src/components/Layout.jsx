@@ -9,13 +9,15 @@ const NAV = [
   { to: '/', label: 'Overview', icon: 'dashboard', end: true },
   { to: '/leads', label: 'Leads', icon: 'leads' },
   { to: '/pipeline', label: 'Pipeline', icon: 'pipeline' },
-  { to: '/campaigns', label: 'Ad Links', icon: 'campaigns' },
+  { to: '/today', label: 'Today', icon: 'clock', badge: 'today' },
+  { to: '/campaigns', label: 'Ads & reports', icon: 'campaigns' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
 export default function Layout() {
   const { user, logout } = useAuth();
   const [newCount, setNewCount] = useState(0);
+  const [todayCount, setTodayCount] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -25,8 +27,8 @@ export default function Layout() {
       .catch(() => null)
       .then((stats) => {
         if (!alive || !stats) return;
-        const n = stats.byStatus?.find((s) => s.status === 'new')?.count || 0;
-        setNewCount(n);
+        setNewCount(stats.byStatus?.find((s) => s.status === 'new')?.count || 0);
+        setTodayCount((stats.followUps?.overdue || 0) + (stats.followUps?.today || 0));
       });
     return () => {
       alive = false;
@@ -38,6 +40,8 @@ export default function Layout() {
     navigate('/login', { replace: true });
   };
 
+  const badges = { today: todayCount, leads: newCount };
+
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -45,7 +49,7 @@ export default function Layout() {
           <div className="brand-mark">L</div>
           <div>
             <div className="brand-name">LeadFlow</div>
-            <div className="brand-sub">Lead capture</div>
+            <div className="brand-sub">Car scrapping</div>
           </div>
         </div>
 
@@ -62,20 +66,11 @@ export default function Layout() {
                 <Icon name={item.icon} size={15} />
               </span>
               {item.label}
-              {item.to === '/leads' && newCount > 0 && <span className="count">{newCount}</span>}
+              {item.badge && badges[item.badge] > 0 && (
+                <span className="count">{badges[item.badge]}</span>
+              )}
             </NavLink>
           ))}
-
-          <span className="nav-label">Your ads</span>
-          <a className="nav-item" href="/f/main" target="_blank" rel="noreferrer">
-            <span className="nav-ico">
-              <Icon name="form" size={15} />
-            </span>
-            Public form
-            <span className="nav-ico" style={{ marginLeft: 'auto' }}>
-              <Icon name="external" size={12} />
-            </span>
-          </a>
         </nav>
 
         <div className="sidebar-foot">
@@ -83,7 +78,9 @@ export default function Layout() {
             <div className="avatar">{(user?.name || 'A').slice(0, 1).toUpperCase()}</div>
             <div className="user-meta">
               <b>{user?.name || 'Admin'}</b>
-              <span>{user?.email}</span>
+              <span>
+                {user?.role === 'admin' ? 'Admin' : user?.role === 'yard' ? 'Yard team' : 'Telecaller'}
+              </span>
             </div>
             <button className="icon-btn" onClick={signOut} title="Sign out" style={{ color: '#94a3b8' }}>
               <Icon name="logout" size={14} />

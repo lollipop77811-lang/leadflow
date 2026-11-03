@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { compactCurrency, currency, initials, num, relativeTime } from '../lib/format';
-import { statusMeta, STATUSES } from '../lib/meta';
+import { compactCurrency, currency, relativeTime, tonnes } from '../lib/format';
+import { LOST_REASONS, STATUSES, statusMeta } from '../lib/meta';
 import { useToast } from '../lib/toast';
 import { usePageHeader } from '../components/PageHeader';
 import StatCard from '../components/StatCard';
@@ -10,11 +10,12 @@ import TrendChart from '../components/TrendChart';
 import SourceBreakdown from '../components/SourceBreakdown';
 import LeadDrawer from '../components/LeadDrawer';
 import AddLeadModal from '../components/AddLeadModal';
-import { SourceTag, StatusBadge } from '../components/Badges';
+import { Chip, FollowUpChip, StatusBadge, VehicleLine } from '../components/Badges';
 import Icon from '../components/Icon';
 
 export default function Overview() {
   const [stats, setStats] = useState(null);
+  const [today, setToday] = useState({ pickups: [], followUps: [] });
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [adding, setAdding] = useState(false);
@@ -24,8 +25,9 @@ export default function Overview() {
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const data = await api('/stats');
-      setStats(data);
+      const [s, t] = await Promise.all([api('/stats'), api('/leads/today').catch(() => null)]);
+      setStats(s);
+      if (t) setToday(t);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -37,7 +39,7 @@ export default function Overview() {
     load();
   }, [load]);
 
-  const totals = stats?.totals;
+  const totals = stats?.totals || {};
   const newCount = stats?.byStatus?.find((s) => s.status === 'new')?.count || 0;
 
   const actions = useMemo(
@@ -46,9 +48,6 @@ export default function Overview() {
         <button className="btn" onClick={() => load(true)} title="Refresh">
           <Icon name="refresh" size={14} /> Refresh
         </button>
-        <a className="btn" href="/f/main" target="_blank" rel="noreferrer">
-          <Icon name="form" size={14} /> Preview form
-        </a>
         <button className="btn btn-primary" onClick={() => setAdding(true)}>
           <Icon name="plus" size={14} /> Add lead
         </button>
@@ -60,13 +59,15 @@ export default function Overview() {
   usePageHeader(
     {
       title: 'Overview',
-      subtitle: 'Every lead from Instagram, Facebook, Google and more — in one place',
+      subtitle: 'Leads, quotes, pickups and paperwork — at a glance',
       actions,
     },
     [actions]
   );
 
   const maxStatus = Math.max(1, ...(stats?.byStatus || []).map((s) => s.count));
+  const maxLost = Math.max(1, ...(stats?.lostReasons || []).map((l) => l.count));
+  const overdue = stats?.followUps?.overdue || 0;
 
   return (
     <div className="page-section">
@@ -82,36 +83,66 @@ export default function Overview() {
         ) : (
           <>
             <StatCard
-              label="Total leads"
-              value={num(totals?.total)}
+              label="New leads today"
+              value={totals.today ?? 0}
               icon="leads"
               tone="brand"
-              foot={`· ${num(totals?.week)} in last 7 days`}
-              trend={{ dir: 'up', value: `${num(totals?.today)} today` }}
+              trend={{ dir: 'up', value: `${newCount} waiting` }}
+              foot="· first call pending"
             />
             <StatCard
-              label="New (to contact)"
-              value={num(newCount)}
-              icon="spark"
-              tone="blue"
-              foot="· waiting for first touch"
-            />
-            <StatCard
-              label="Open pipeline"
-              value={compactCurrency(totals?.pipelineValue)}
-              icon="trend"
-              tone="violet"
-              foot={`· won ${compactCurrency(totals?.wonValue)}`}
-            />
-            <StatCard
-              label="Conversion rate"
-              value={`${totals?.conversionRate ?? 0}%`}
-              icon="check"
+              label="Vehicles picked up (month)"
+              value={totals.receivedMonth ?? 0}
+              icon="truck"
               tone="green"
-              foot={`· ${num(totals?.converted)} converted`}
+              foot={`· ${tonnes(totals.tonnageMonth)} scrapped`}
+            />
+            <StatCard
+              label="Quotes out"
+              value={totals.quotesOut ?? 0}
+              icon="rupee"
+              tone="violet"
+              foot={`· ${compactCurrency(totals.openQuoteValue)} in play`}
+            />
+            <StatCard
+              label="Payout pending"
+              value={compactCurrency(totals.pendingPayout)}
+              icon="clock"
+              tone="amber"
+              foot={`· ${compactCurrency(totals.paidMonth)} paid`}
             />
           </>
         )}
+      </div>
+
+      <div className="mini-stats">
+        <button className="mini-stat" onClick={() => navigate('/today')}>
+          <span className="mini-label">Pickups today</span>
+          <b>{stats?.pickupsToday ?? 0}</b>
+        </button>
+        <button className="mini-stat" onClick={() => navigate('/today')}>
+          <span className="mini-label">Follow-ups due</span>
+          <b>
+            {(stats?.followUps?.today || 0) + overdue}
+            {overdue > 0 && <em className="mini-danger"> · {overdue} overdue</em>}
+          </b>
+        </button>
+        <div className="mini-stat">
+          <span className="mini-label">Lead → pickup</span>
+          <b>{totals.conversionRate ?? 0}%</b>
+        </div>
+        <div className="mini-stat">
+          <span className="mini-label">Avg. first response</span>
+          <b>{totals.avgResponseMins ? `${totals.avgResponseMins} min` : '—'}</b>
+        </div>
+        <div className="mini-stat">
+          <span className="mini-label">Cost per lead</span>
+          <b>{totals.cpl ? currency(totals.cpl) : '—'}</b>
+        </div>
+        <div className="mini-stat">
+          <span className="mini-label">Cost per pickup</span>
+          <b>{totals.costPerPickup ? currency(totals.costPerPickup) : '—'}</b>
+        </div>
       </div>
 
       <div className="split">
@@ -123,28 +154,24 @@ export default function Overview() {
             </div>
             <div className="spacer" />
             <span className="pill" style={{ background: 'var(--brand-soft)', color: 'var(--brand-ink)' }}>
-              {num((stats?.timeline || []).reduce((a, b) => a + b.count, 0))} in window
+              {(stats?.timeline || []).reduce((a, b) => a + b.count, 0)} in window
             </span>
           </div>
-          {stats ? (
-            <TrendChart data={stats.timeline} />
-          ) : (
-            <div className="skeleton" style={{ height: 196, margin: 14 }} />
-          )}
+          {stats ? <TrendChart data={stats.timeline} /> : <div className="skeleton" style={{ height: 190, margin: 14 }} />}
         </div>
 
         <div className="card">
           <div className="card-head">
             <div>
               <h3>Where leads come from</h3>
-              <div className="sub">Attributed ad platform</div>
+              <div className="sub">Attribution by platform</div>
             </div>
             <div className="spacer" />
             <button className="btn btn-sm btn-ghost" onClick={() => navigate('/campaigns')}>
-              Links <Icon name="arrowUpRight" size={12} />
+              Ads <Icon name="arrowUpRight" size={12} />
             </button>
           </div>
-          <SourceBreakdown items={stats?.bySource || []} total={totals?.total || 0} />
+          <SourceBreakdown items={stats?.bySource || []} total={totals.total || 0} />
         </div>
       </div>
 
@@ -152,35 +179,113 @@ export default function Overview() {
         <div className="card">
           <div className="card-head">
             <div>
-              <h3>Pipeline by status</h3>
-              <div className="sub">Click a stage to open the board</div>
+              <h3>Today’s priorities</h3>
+              <div className="sub">Pickups scheduled and calls due</div>
+            </div>
+            <div className="spacer" />
+            <button className="btn btn-sm btn-ghost" onClick={() => navigate('/today')}>
+              Open <Icon name="right" size={12} />
+            </button>
+          </div>
+          <div className="list-pad">
+            {today.pickups.slice(0, 3).map((lead) => (
+              <div className="task-row" key={lead._id} onClick={() => setSelected(lead._id)}>
+                <span className="task-icon pickup">🚚</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className="task-title">{lead.name}</div>
+                  <div className="task-sub">
+                    <VehicleLine lead={lead} showMeta={false} /> · {lead.pickup?.slot || 'any time'}
+                  </div>
+                </div>
+                <StatusBadge status={lead.status} small />
+              </div>
+            ))}
+
+            {today.followUps.slice(0, 4).map((lead) => (
+              <div className="task-row" key={lead._id} onClick={() => setSelected(lead._id)}>
+                <span className="task-icon call">☎</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className="task-title">{lead.name}</div>
+                  <div className="task-sub">
+                    <VehicleLine lead={lead} showMeta={false} /> · {lead.phone}
+                  </div>
+                </div>
+                <FollowUpChip date={lead.followUpAt} status={lead.status} />
+              </div>
+            ))}
+
+            {today.pickups.length === 0 && today.followUps.length === 0 && (
+              <div className="empty" style={{ padding: '26px 10px' }}>
+                <div className="emoji">☕</div>
+                <h4>Nothing due today</h4>
+                <p>Schedule follow-ups from a lead to see them here.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <h3>Latest enquiries</h3>
+              <div className="sub">Fresh submissions from your form</div>
+            </div>
+            <div className="spacer" />
+            <button className="btn btn-sm btn-ghost" onClick={() => navigate('/leads')}>
+              View all <Icon name="right" size={12} />
+            </button>
+          </div>
+          <div style={{ padding: '6px 8px 10px' }}>
+            {(stats?.recent || []).map((lead) => (
+              <div key={lead._id} className="recent-row" onClick={() => setSelected(lead._id)}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className="recent-name">
+                    {lead.name}
+                    {lead.duplicateCount > 0 && <Chip color="#b45309">↺</Chip>}
+                  </div>
+                  <div className="lead-sub">
+                    <VehicleLine lead={lead} /> · {relativeTime(lead.createdAt)}
+                  </div>
+                </div>
+                {lead.quote?.amount > 0 && (
+                  <span style={{ fontSize: 12, fontWeight: 650 }}>{currency(lead.quote.amount)}</span>
+                )}
+                <StatusBadge status={lead.status} small />
+              </div>
+            ))}
+            {!loading && (stats?.recent || []).length === 0 && (
+              <div className="empty">
+                <div className="emoji">🌱</div>
+                <h4>No leads yet</h4>
+                <p>Submit your public form to see the first one arrive.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="split-even">
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <h3>Pipeline by stage</h3>
+              <div className="sub">Where the enquiries are sitting</div>
             </div>
             <div className="spacer" />
             <button className="btn btn-sm btn-ghost" onClick={() => navigate('/pipeline')}>
-              Open board <Icon name="right" size={12} />
+              Board <Icon name="right" size={12} />
             </button>
           </div>
-          <div style={{ padding: '14px 18px 18px', display: 'grid', gap: 12 }}>
+          <div style={{ padding: '14px 18px 18px', display: 'grid', gap: 11 }}>
             {STATUSES.map((s) => {
               const count = stats?.byStatus?.find((x) => x.status === s.id)?.count || 0;
               return (
-                <div
-                  key={s.id}
-                  onClick={() => navigate(`/pipeline?status=${s.id}`)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      fontSize: 12.5,
-                      marginBottom: 5,
-                    }}
-                  >
+                <div key={s.id} onClick={() => navigate(`/pipeline?status=${s.id}`)} style={{ cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 5 }}>
                     <span style={{ fontWeight: 600, color: statusMeta(s.id).color }}>{s.label}</span>
-                    <span style={{ color: 'var(--muted)', fontWeight: 550 }}>{num(count)}</span>
+                    <span style={{ color: 'var(--muted)', fontWeight: 550 }}>{count}</span>
                   </div>
-                  <div className="bar-track" style={{ height: 8 }}>
+                  <div className="bar-track" style={{ height: 7 }}>
                     <div
                       className="bar-fill"
                       style={{
@@ -199,77 +304,42 @@ export default function Overview() {
         <div className="card">
           <div className="card-head">
             <div>
-              <h3>Latest leads</h3>
-              <div className="sub">Fresh submissions from your form</div>
+              <h3>Why leads are lost</h3>
+              <div className="sub">Lost reasons recorded by the team</div>
             </div>
-            <div className="spacer" />
-            <button className="btn btn-sm btn-ghost" onClick={() => navigate('/leads')}>
-              View all <Icon name="right" size={12} />
-            </button>
           </div>
-          <div style={{ padding: '6px 8px 10px' }}>
-            {(stats?.recent || []).map((lead) => (
-              <div
-                key={lead._id}
-                onClick={() => setSelected(lead._id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '9px 10px',
-                  borderRadius: 10,
-                  cursor: 'pointer',
-                }}
-                className="recent-row"
-                onMouseEnter={(e) => (e.currentTarget.style.background = '#fafbff')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-              >
-                <span className="avatar-sq" style={{ width: 30, height: 30, borderRadius: 9 }}>
-                  {initials(lead.name)}
-                </span>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {lead.name}
-                  </div>
-                  <div className="lead-sub">
-                    <SourceTag source={lead.source} showDot={false} /> · {relativeTime(lead.createdAt)}
-                  </div>
-                </div>
-                {lead.value > 0 && (
-                  <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--ink-2)' }}>
-                    {currency(lead.value)}
-                  </span>
-                )}
-                <StatusBadge status={lead.status} />
-              </div>
-            ))}
-            {!loading && (stats?.recent || []).length === 0 && (
-              <div className="empty">
-                <div className="emoji">🌱</div>
-                <h4>No leads yet</h4>
-                <p>Submit your public form to see the first lead arrive.</p>
-                <a className="btn btn-sm btn-primary" href="/f/main" target="_blank" rel="noreferrer" style={{ marginTop: 12 }}>
-                  Open the form
-                </a>
+          <div style={{ padding: '14px 18px 18px', display: 'grid', gap: 10 }}>
+            {(stats?.lostReasons || []).filter((l) => l.count > 0).length === 0 && (
+              <div className="empty" style={{ padding: '22px 8px' }}>
+                <div className="emoji">🎯</div>
+                <h4>No lost leads</h4>
+                <p>Lost reasons will show up here once recorded.</p>
               </div>
             )}
+            {(stats?.lostReasons || [])
+              .filter((l) => l.count > 0)
+              .map((l) => (
+                <div key={l.reason}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 4 }}>
+                    <span>{LOST_REASONS.find((r) => r.id === l.reason)?.label || l.reason}</span>
+                    <span style={{ color: 'var(--muted)', fontWeight: 600 }}>{l.count}</span>
+                  </div>
+                  <div className="bar-track">
+                    <div
+                      className="bar-fill"
+                      style={{ width: `${Math.max(4, (l.count / maxLost) * 100)}%`, background: '#ef4444', opacity: 0.75 }}
+                    />
+                  </div>
+                </div>
+              ))}
           </div>
         </div>
       </div>
 
       {selected && (
-        <LeadDrawer
-          leadId={selected}
-          onClose={() => setSelected(null)}
-          onChanged={() => load(true)}
-        />
+        <LeadDrawer leadId={selected} onClose={() => setSelected(null)} onChanged={() => load(true)} />
       )}
-      {adding && (
-        <AddLeadModal
-          onClose={() => setAdding(false)}
-          onCreated={() => load(true)}
-        />
-      )}
+      {adding && <AddLeadModal onClose={() => setAdding(false)} onCreated={() => load(true)} />}
     </div>
   );
 }

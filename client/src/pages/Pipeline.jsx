@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api, qs } from '../lib/api';
 import { compactCurrency, currency, relativeTime } from '../lib/format';
-import { SOURCES, sourceMeta, STATUSES } from '../lib/meta';
+import { LOST_REASONS, SOURCES, STATUSES, statusMeta } from '../lib/meta';
 import { useToast } from '../lib/toast';
 import { usePageHeader } from '../components/PageHeader';
 import LeadDrawer from '../components/LeadDrawer';
 import AddLeadModal from '../components/AddLeadModal';
+import Modal from '../components/Modal';
+import { Chip, DocProgress, FollowUpChip, VehicleLine } from '../components/Badges';
 import Icon from '../components/Icon';
 
 export default function Pipeline() {
+  const [params] = useSearchParams();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -17,7 +21,10 @@ export default function Pipeline() {
   const [overCol, setOverCol] = useState(null);
   const [selected, setSelected] = useState(null);
   const [adding, setAdding] = useState(false);
+  const [lostFor, setLostFor] = useState(null);
   const toast = useToast();
+
+  const focusStage = params.get('status');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -39,30 +46,43 @@ export default function Pipeline() {
     const q = search.trim().toLowerCase();
     if (!q) return leads;
     return leads.filter((l) =>
-      [l.name, l.email, l.company, l.campaign?.name].join(' ').toLowerCase().includes(q)
+      [l.name, l.phone, l.vehicle?.make, l.vehicle?.model, l.campaign?.name]
+        .join(' ')
+        .toLowerCase()
+        .includes(q)
     );
   }, [leads, search]);
 
   const grouped = useMemo(() => {
     const map = Object.fromEntries(STATUSES.map((s) => [s.id, []]));
-    filtered.forEach((l) => {
-      (map[l.status] || map.new).push(l);
-    });
+    filtered.forEach((l) => (map[l.status] || map.new).push(l));
     return map;
   }, [filtered]);
 
-  const moveLead = async (id, status) => {
+  const moveLead = async (id, status, lostReason) => {
     const lead = leads.find((l) => l._id === id);
     if (!lead || lead.status === status) return;
-    const prev = lead.status;
-    setLeads((all) => all.map((l) => (l._id === id ? { ...l, status } : l)));
+    const prev = { status: lead.status, lostReason: lead.lostReason };
+    setLeads((all) => all.map((l) => (l._id === id ? { ...l, status, lostReason: lostReason || '' } : l)));
     try {
-      await api(`/leads/${id}`, { method: 'PATCH', body: { status } });
-      toast.success(`Moved to ${status}`);
+      await api(`/leads/${id}`, { method: 'PATCH', body: { status, ...(lostReason ? { lostReason } : {}) } });
+      toast.success(`Moved to ${statusMeta(status).label}`);
     } catch (err) {
-      setLeads((all) => all.map((l) => (l._id === id ? { ...l, status: prev } : l)));
+      setLeads((all) => all.map((l) => (l._id === id ? { ...l, ...prev } : l)));
       toast.error(err.message);
     }
+  };
+
+  const onDrop = (status) => {
+    setOverCol(null);
+    const id = dragId;
+    setDragId(null);
+    if (!id) return;
+    if (status === 'lost') {
+      setLostFor(id);
+      return;
+    }
+    moveLead(id, status);
   };
 
   const actions = useMemo(
@@ -77,7 +97,7 @@ export default function Pipeline() {
   usePageHeader(
     {
       title: 'Pipeline',
-      subtitle: 'Drag a card to move a lead through your sales stages',
+      subtitle: 'Drag a card to move the car through your stages',
       actions,
     },
     [actions]
@@ -93,17 +113,12 @@ export default function Pipeline() {
             </span>
             <input
               className="input"
-              placeholder="Filter cards by name, email, campaign…"
+              placeholder="Filter by name, phone, car, campaign…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <select
-            className="select"
-            style={{ width: 160 }}
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-          >
+          <select className="select" style={{ width: 160 }} value={source} onChange={(e) => setSource(e.target.value)}>
             <option value="">All platforms</option>
             {SOURCES.map((s) => (
               <option key={s.id} value={s.id}>
@@ -111,20 +126,19 @@ export default function Pipeline() {
               </option>
             ))}
           </select>
-          <span className="filter-count">
-            {filtered.length} of last 100 leads shown
-          </span>
+          <span className="filter-count">{filtered.length} of the latest 100 leads</span>
         </div>
 
         <div style={{ padding: 12, overflowX: 'auto' }}>
-          <div className="board">
+          <div className="board board-8">
             {STATUSES.map((status) => {
               const items = grouped[status.id] || [];
-              const value = items.reduce((a, b) => a + (Number(b.value) || 0), 0);
+              const value = items.reduce((a, b) => a + (Number(b.quote?.amount) || 0), 0);
+              const highlighted = focusStage === status.id;
               return (
                 <div
                   key={status.id}
-                  className={`column ${overCol === status.id ? 'drag-over' : ''}`}
+                  className={`column ${overCol === status.id ? 'drag-over' : ''} ${highlighted ? 'focused' : ''}`}
                   onDragOver={(e) => {
                     e.preventDefault();
                     setOverCol(status.id);
@@ -132,22 +146,13 @@ export default function Pipeline() {
                   onDragLeave={() => setOverCol((c) => (c === status.id ? null : c))}
                   onDrop={(e) => {
                     e.preventDefault();
-                    setOverCol(null);
-                    if (dragId) moveLead(dragId, status.id);
-                    setDragId(null);
+                    onDrop(status.id);
                   }}
                 >
                   <div className="column-head">
-                    <span
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        background: status.color,
-                      }}
-                    />
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: status.color }} />
                     <span className="name" style={{ color: status.color }}>
-                      {status.label}
+                      {status.short}
                     </span>
                     <span className="n">{items.length}</span>
                   </div>
@@ -163,73 +168,34 @@ export default function Pipeline() {
                     >
                       <div className="kname">{lead.name}</div>
                       <div className="kmeta">
-                        <span
-                          className="src-dot"
-                          style={{
-                            width: 14,
-                            height: 14,
-                            borderRadius: 4,
-                            fontSize: 8,
-                            background: sourceMeta(lead.source).color,
-                          }}
-                        >
-                          {sourceMeta(lead.source).letter}
-                        </span>
-                        <span
-                          style={{
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            maxWidth: 130,
-                          }}
-                        >
-                          {lead.campaign?.name || lead.company || 'Direct'}
-                        </span>
+                        <VehicleLine lead={lead} />
                       </div>
-                      {lead.tags?.length > 0 && (
-                        <div className="ktags">
-                          {lead.tags.slice(0, 3).map((t) => (
-                            <span className="tag" key={t}>
-                              {t}
-                            </span>
-                          ))}
+                      {lead.duplicateCount > 0 && (
+                        <div style={{ marginTop: 5 }}>
+                          <Chip color="#b45309">↺ repeat</Chip>
                         </div>
                       )}
+                      <div className="ktags">
+                        {lead.followUpAt && <FollowUpChip date={lead.followUpAt} status={lead.status} />}
+                        {lead.pickup?.scheduledDate && (
+                          <Chip color="#0369a1">🚚 {relativeTime(lead.pickup.scheduledDate)}</Chip>
+                        )}
+                      </div>
                       <div className="kvalue">
-                        {lead.value ? currency(lead.value) : '— value'}
-                        <span style={{ marginLeft: 'auto', color: 'var(--muted)', fontWeight: 500 }}>
-                          {relativeTime(lead.createdAt)}
+                        {lead.quote?.amount ? currency(lead.quote.amount) : '— quote'}
+                        <span style={{ marginLeft: 'auto' }}>
+                          <DocProgress documents={lead.documents} />
                         </span>
                       </div>
                     </div>
                   ))}
 
                   {items.length === 0 && (
-                    <div
-                      style={{
-                        fontSize: 11.5,
-                        color: '#94a3b8',
-                        textAlign: 'center',
-                        padding: '16px 6px',
-                        border: '1px dashed #d5daeb',
-                        borderRadius: 9,
-                      }}
-                    >
-                      {loading ? 'Loading…' : 'Drop leads here'}
-                    </div>
+                    <div className="column-empty">{loading ? 'Loading…' : 'Drop leads here'}</div>
                   )}
 
                   {items.length > 0 && (
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: 'var(--muted)',
-                        padding: '4px 4px 0',
-                        fontWeight: 600,
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                      }}
-                    >
+                    <div className="column-foot">
                       <span>Stage value</span>
                       <span>{compactCurrency(value)}</span>
                     </div>
@@ -240,6 +206,31 @@ export default function Pipeline() {
           </div>
         </div>
       </div>
+
+      {lostFor && (
+        <Modal
+          title="Why is this lead lost?"
+          subtitle="Lost reasons power your reports — pick the closest one."
+          onClose={() => setLostFor(null)}
+          width={430}
+        >
+          <div style={{ display: 'grid', gap: 8 }}>
+            {LOST_REASONS.map((r) => (
+              <button
+                key={r.id}
+                className="btn"
+                style={{ justifyContent: 'flex-start' }}
+                onClick={() => {
+                  moveLead(lostFor, 'lost', r.id);
+                  setLostFor(null);
+                }}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
 
       {selected && (
         <LeadDrawer
