@@ -15,24 +15,19 @@ const NAV = [
 
 export default function Layout() {
   const { user, logout } = useAuth();
-  const [db, setDb] = useState(null);
   const [newCount, setNewCount] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
     let alive = true;
-    Promise.all([
-      api('/health', { auth: false }).catch(() => null),
-      api('/stats').catch(() => null),
-    ]).then(([health, stats]) => {
-      if (!alive) return;
-      if (health) setDb(health.db);
-      if (stats) {
+    api('/stats')
+      .catch(() => null)
+      .then((stats) => {
+        if (!alive || !stats) return;
         const n = stats.byStatus?.find((s) => s.status === 'new')?.count || 0;
         setNewCount(n);
-      }
-    });
+      });
     return () => {
       alive = false;
     };
@@ -84,16 +79,6 @@ export default function Layout() {
         </nav>
 
         <div className="sidebar-foot">
-          <div className="db-chip">
-            <span className={`dot ${db === 'memory' ? 'memory' : ''}`} />
-            <span>
-              {db === 'memory'
-                ? 'In-memory DB · demo data resets'
-                : db
-                  ? 'MongoDB connected'
-                  : 'Checking database…'}
-            </span>
-          </div>
           <div className="user-card">
             <div className="avatar">{(user?.name || 'A').slice(0, 1).toUpperCase()}</div>
             <div className="user-meta">
