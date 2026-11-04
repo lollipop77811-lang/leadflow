@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { DEMO_MODE, api, resetDemoData } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useToast } from '../lib/toast';
 import { usePageHeader } from '../components/PageHeader';
@@ -366,6 +366,36 @@ export default function Settings() {
           </div>
         </div>
       </div>
+
+      {DEMO_MODE && (
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <h3>Demo data</h3>
+              <div className="sub">This preview build runs in your browser</div>
+            </div>
+            <div className="spacer" />
+            <Chip color="#7c3aed">Demo mode</Chip>
+          </div>
+          <div className="card-pad" style={{ display: 'grid', gap: 10 }}>
+            <p style={{ fontSize: 12.8, color: 'var(--ink-2)', lineHeight: 1.7 }}>
+              Everything here is local sample data saved in this browser — nothing is sent to a server. Every
+              action works: add a lead, send a quote, schedule a pickup, tick documents, mark it paid.
+            </p>
+            <div>
+              <button
+                className="btn btn-sm"
+                onClick={() => {
+                  window.confirm('Reset the demo back to the original sample leads?') &&
+                    (resetDemoData(), window.location.reload());
+                }}
+              >
+                <Icon name="refresh" size={13} /> Reset demo data
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <div className="card-head">

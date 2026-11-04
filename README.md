@@ -8,6 +8,39 @@ enquiry lands in this dashboard with the vehicle, quote, pickup and RTO paperwor
 
 ---
 
+## Two ways to run it
+
+| | **Demo mode** (client walkthrough) | **Real mode** (production) |
+| --- | --- | --- |
+| Backend | none — data lives in the browser | Express + MongoDB Atlas |
+| Login | **any email + password** | JWT accounts you create |
+| Data | 20 realistic car leads, ad spend, team | whatever your customers submit |
+| Set by | `VITE_DEMO_MODE=true` (default) | `VITE_DEMO_MODE=false` |
+
+Demo mode exists so the **static Netlify build** can be shown to the client with no server, no database and no
+credentials to remember. Every button still works — quotes, pickups, documents, CD, payouts, CSV export,
+ad spend — because the demo layer saves to `localStorage`. Settings → *Demo data → Reset* restores the sample
+leads before the next walkthrough.
+
+**Deploying the demo to Netlify**
+
+```bash
+# from the repo root — this is all Netlify needs
+netlify deploy --prod          # or connect the GitHub repo in the Netlify UI
+```
+
+`netlify.toml` is committed and already sets the base (`client`), the build command (`npm install && npm run
+build`), the publish directory (`dist`), the SPA redirect and `VITE_DEMO_MODE=true`. Or set it manually in the
+UI: **Base directory** `client` · **Build command** `npm install && npm run build` · **Publish** `dist`.
+
+**Switching the same site back to the real backend**
+
+1. Set `VITE_DEMO_MODE=false` (Netlify env var or `client/.env`) and redeploy.
+2. Host the API, then uncomment the `/api/*` proxy block at the bottom of `netlify.toml` and point it at it.
+3. Log in with the admin account from `server/.env`.
+
+---
+
 ## The workflow this app supports
 
 ```
@@ -112,6 +145,9 @@ Open **http://localhost:5173**
 | --- | --- |
 | Admin | `admin@leadflow.dev` / `admin123` |
 | Telecaller | `ravi@leadflow.dev` / `ravi123` |
+
+> **Demo mode is on by default**, so when you open the app you can type *any* email and password and get in —
+> that is the build you show clients. Set `VITE_DEMO_MODE=false` in `client/.env` to force real JWT logins.
 
 > No database configured? The API boots an **in-memory MongoDB** with 15 realistic demo leads, 2 months of ad
 > spend and a demo telecaller. Data resets on restart. Change the admin credentials in `server/.env` before
@@ -245,7 +281,7 @@ leadflow/
     └── src/
         ├── pages/        Login · Overview · Leads · Pipeline · Today · Campaigns · Settings · PublicForm
         ├── components/   Layout · PageHeader · LeadDrawer · Badges · TrendChart · Modal …
-        ├── lib/          api · auth · meta (statuses, sources, WA templates) · format · image
+        ├── lib/          api (live + demo switch) · mockApi / demoStore · auth · meta · format · image
         └── styles/       design system (no CSS framework)
 ```
 
@@ -254,6 +290,7 @@ leadflow/
 ## Before the client sees it
 
 - Set `SEED_DEMO=false` and start with a clean Atlas database
+- Set `VITE_DEMO_MODE=false` in `client/.env` and redeploy — otherwise any email opens the dashboard
 - Change `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `JWT_SECRET`
 - Add the real **RVSF number**, brand name and WhatsApp number to `.env`
 - Set `SERVICE_PINCODES` if he only picks up in certain cities

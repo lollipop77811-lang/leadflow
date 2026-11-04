@@ -1,0 +1,38 @@
+# Netlify configuration — static demo of the LeadFlow dashboard
+#
+# The dashboard is a Vite SPA. In demo mode it needs no backend: any email +
+# password signs in and every screen runs on realistic in-browser demo data.
+#
+# To point the same site at the real Express + MongoDB API:
+#   1. set VITE_DEMO_MODE = "false" below (or in Netlify → Site settings → Env)
+#   2. host the API somewhere and proxy /api to it (see the redirect block below)
+
+[build]
+  base = "client"
+  command = "npm install && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  VITE_DEMO_MODE = "true"
+
+# SPA routing — every path renders index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
+
+# When you host the real API, uncomment and point this at it.
+# [[redirects]]
+#   from = "/api/*"
+#   to = "https://your-api-host.com/api/:splat"
+#   status = 200
+#   force = true
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

@@ -1,3 +1,15 @@
+import { mockApi, mockCsv, resetState } from './mockApi';
+
+/**
+ * DEMO MODE
+ * The static client (e.g. the Netlify build used to show the client around)
+ * runs without any backend: any email + password logs in and every screen is
+ * served realistic demo data from the browser.
+ * Set VITE_DEMO_MODE=false to talk to the real Express + MongoDB API again.
+ */
+export const DEMO_MODE = String(import.meta.env.VITE_DEMO_MODE ?? 'true').toLowerCase() !== 'false';
+export { resetState as resetDemoData };
+
 const TOKEN_KEY = 'leadflow.token';
 const USER_KEY = 'leadflow.user';
 
@@ -29,6 +41,14 @@ export class ApiError extends Error {
 export async function api(path, { method = 'GET', body, auth = true, signal } = {}) {
   const headers = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
+
+  if (DEMO_MODE) {
+    try {
+      return await mockApi(path, { method, body });
+    } catch (err) {
+      throw new ApiError(err.message || 'Something went wrong.', err.status || 500, err.errors);
+    }
+  }
 
   const token = getToken();
   if (auth && token) headers.Authorization = `Bearer ${token}`;
@@ -66,6 +86,20 @@ export const qs = (params) => {
 };
 
 export async function downloadCsv(params) {
+  if (DEMO_MODE) {
+    const { csv, filename, rows } = await mockCsv(params);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    return rows;
+  }
+
   const token = getToken();
   const res = await fetch(`/api/leads/export.csv${qs(params)}`, {
     headers: { Authorization: `Bearer ${token}` },
